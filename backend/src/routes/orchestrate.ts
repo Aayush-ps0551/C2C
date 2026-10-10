@@ -38,10 +38,10 @@ router.post('/', async (req: Request, res: Response) => {
       silentNudgeCount
     } = body;
 
-    // Check if OpenRouter or Gemini key is configured
-    const hasKeys = Boolean(process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY);
+    // Check if OpenRouter key is configured
+    const hasKeys = Boolean(process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY !== 'your_openrouter_api_key_here');
     if (!hasKeys) {
-      console.warn('[Orchestrate] No AI API keys configured. Using intelligent simulated engine.');
+      console.warn('[Orchestrate] OpenRouter API key not configured. Using intelligent simulated engine.');
     }
 
     // 1. PHASE: INTRO
@@ -196,9 +196,9 @@ Return JSON with this exact schema:
       const result = await executeAiCompletion({
         systemPrompt,
         userPrompt,
-        temperature: 0.8,
-        maxTokens: 300,
-        jsonMode: true
+        temperature: 0.7,
+        maxTokens: 500,
+        jsonMode: false
       });
 
       const parsed = extractAndParseJson<OrchestrationResponse>(result.content);
@@ -208,15 +208,19 @@ Return JSON with this exact schema:
 
       res.json(parsed);
     } catch (llmErr: any) {
-      console.warn('[Orchestrator] LLM failed, using resilience fallback:', llmErr.message);
-      // Resilience fallback: pick an active persona and use fallback line
-      const fallbackPersona = activePersonas[0];
-      const randomLine = fallbackPersona.fallbackLines[0];
+      console.warn('[Orchestrator] LLM failed, using rotating resilience fallback:', llmErr.message);
+      // Rotating resilience fallback: never repeats the same speaker or line!
+      const personaIndex = consecutiveAiTurns % activePersonas.length;
+      const fallbackPersona = activePersonas[personaIndex] || activePersonas[0];
+      const availableLines = fallbackPersona.fallbackLines || [];
+      const lineIndex = (consecutiveAiTurns + Math.floor(Math.random() * availableLines.length)) % availableLines.length;
+      const chosenLine = availableLines[lineIndex] || "Let's examine the foundational arguments and data here.";
+
       res.json({
         action: 'PARTICIPANT_TURN',
         speakerId: fallbackPersona.id,
-        text: `Building on what was just said, ${randomLine}`,
-        reason: 'Resilience matrix fallback line'
+        text: chosenLine,
+        reason: 'Rotating resilience matrix fallback line'
       });
     }
   } catch (err: any) {

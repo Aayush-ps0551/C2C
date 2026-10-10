@@ -1,14 +1,36 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import path from 'path';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// Robust dotenv resolution with override
+dotenv.config({ path: path.resolve(__dirname, '../../../.env'), override: true });
+dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
+dotenv.config({ path: path.resolve(process.cwd(), '../.env'), override: true });
+dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
+dotenv.config({ override: true });
 
-export const isSupabaseConfigured = Boolean(
-  supabaseUrl && 
-  supabaseAnonKey && 
-  supabaseUrl !== 'https://your-project.supabase.co'
-);
+function getSupabaseConfig() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  const isConfigured = Boolean(
+    url && 
+    key && 
+    url !== 'https://your-project.supabase.co' &&
+    key !== 'your-supabase-anon-key'
+  );
+  return { url, key, isConfigured };
+}
 
-export const supabase = isSupabaseConfigured 
-  ? createClient(supabaseUrl, supabaseAnonKey) 
-  : null;
+let cachedClient: SupabaseClient | null = null;
+
+export function getSupabase(): SupabaseClient | null {
+  const { url, key, isConfigured } = getSupabaseConfig();
+  if (!isConfigured) return null;
+  if (!cachedClient) {
+    cachedClient = createClient(url, key);
+  }
+  return cachedClient;
+}
+
+export const isSupabaseConfigured = Boolean(getSupabaseConfig().isConfigured);
+export const supabase = getSupabase();

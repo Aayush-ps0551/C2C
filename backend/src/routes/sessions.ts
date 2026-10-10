@@ -1,12 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import { 
   createSessionDb, 
   getSessionDb, 
   listSessionsDb, 
   updateSessionStatusDb, 
   addTurnDb, 
-  getTurnsDb 
+  getTurnsDb,
+  ensureUuid
 } from '../db';
 import { selectRandomPanel, PERSONAS } from '../lib/personas';
 import { Session, Turn } from '../lib/types';
@@ -24,7 +26,9 @@ const CreateSessionSchema = z.object({
     patienceMs: z.number().min(800).max(3000).default(1500),
     nudgeSecs: z.number().default(90),
     languageMode: z.enum(['EN', 'HINGLISH']).default('EN'),
-    panelSize: z.number().default(4)
+    panelSize: z.number().default(4),
+    intensity: z.enum(['CAMPUS_MOCK', 'REAL_GD', 'PLACEMENT_BRUTAL']).default('REAL_GD'),
+    openingRoundEnabled: z.boolean().default(true)
   }).optional()
 });
 
@@ -35,7 +39,7 @@ router.post('/', async (req: Request, res: Response) => {
     const selectedPersonas = selectRandomPanel(parsed.panelSize);
     const personaIds = selectedPersonas.map(p => p.id);
 
-    const sessionId = 'session_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
+    const sessionId = randomUUID();
 
     const newSession: Session = {
       id: sessionId,
@@ -50,7 +54,9 @@ router.post('/', async (req: Request, res: Response) => {
         patienceMs: 1500,
         nudgeSecs: 90,
         languageMode: parsed.languageMode,
-        panelSize: parsed.panelSize
+        panelSize: parsed.panelSize,
+        intensity: 'REAL_GD',
+        openingRoundEnabled: true
       },
       status: 'IN_PROGRESS',
       durationSec: 0,
@@ -98,14 +104,24 @@ router.get('/:id', async (req: Request, res: Response) => {
 router.post('/:id/turns', async (req: Request, res: Response) => {
   try {
     const turnData = req.body as Turn;
-    turnData.sessionId = req.params.id;
-    if (!turnData.id) {
-      turnData.id = 'turn_' + Math.random().toString(36).substring(2, 9);
-    }
+    turnData.sessionId = ensureUuid(req.params.id);
+    turnData.id = ensureUuid(turnData.id);
+
     await addTurnDb(turnData);
     res.status(201).json({ turn: turnData });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to record turn', message: err.message });
+  }
+});
+
+// POST /api/sessions/:id/events - Record session event
+router.post('/:id/events', async (req: Request, res: Response) => {
+  try {
+    const event = req.body;
+    console.log(`[SessionEvent] 📌 Session ${req.params.id} event logged: ${event.type}`, event.meta);
+    res.status(201).json({ success: true, event });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to record event', message: err.message });
   }
 });
 

@@ -10,6 +10,7 @@ export interface PersonaVoiceConfig {
   rate: number;
   gender: 'male' | 'female';
   preferredVoiceNames: string[];
+  stereoPan: number; // -0.6..+0.6 screen position mapping
 }
 
 export const PERSONA_VOICE_CONFIGS: Record<string, PersonaVoiceConfig> = {
@@ -17,44 +18,50 @@ export const PERSONA_VOICE_CONFIGS: Record<string, PersonaVoiceConfig> = {
     pitch: 1.0,
     rate: 0.95,
     gender: 'female',
-    preferredVoiceNames: ['Google UK English Female', 'Microsoft Zira', 'Samantha', 'Karen', 'Victoria']
+    preferredVoiceNames: ['Google UK English Female', 'Microsoft Zira', 'Samantha', 'Karen', 'Victoria'],
+    stereoPan: 0.0
   },
   aarav: {
     pitch: 1.05,
     rate: 1.15,
     gender: 'male',
-    preferredVoiceNames: ['Google UK English Male', 'Microsoft David', 'Daniel', 'Alex', 'Rishi']
+    preferredVoiceNames: ['Google UK English Male', 'Microsoft David', 'Daniel', 'Alex', 'Rishi'],
+    stereoPan: -0.6
   },
   meera: {
     pitch: 1.0,
-    rate: 1.0,
+    rate: 1.05,
     gender: 'female',
-    preferredVoiceNames: ['Google US English', 'Microsoft Jenny', 'Fiona', 'Moira', 'Veena']
+    preferredVoiceNames: ['Google US English', 'Microsoft Jenny', 'Fiona', 'Moira', 'Veena'],
+    stereoPan: -0.3
   },
   rohan: {
     pitch: 0.85,
-    rate: 0.9,
+    rate: 0.88,
     gender: 'male',
-    preferredVoiceNames: ['Google US English', 'Microsoft Mark', 'Fred', 'Arthur']
+    preferredVoiceNames: ['Google US English', 'Microsoft Mark', 'Fred', 'Arthur'],
+    stereoPan: 0.1
   },
   priya: {
-    pitch: 1.25,
-    rate: 1.05,
+    pitch: 1.2,
+    rate: 1.08,
     gender: 'female',
-    preferredVoiceNames: ['Google US English Female', 'Tessa', 'Princess', 'Kathy']
+    preferredVoiceNames: ['Google US English Female', 'Tessa', 'Princess', 'Kathy'],
+    stereoPan: 0.35
   },
   vikram: {
     pitch: 0.95,
-    rate: 1.1,
+    rate: 0.98,
     gender: 'male',
-    preferredVoiceNames: ['Google UK English Male', 'Microsoft George', 'Gordon', 'Oliver']
+    preferredVoiceNames: ['Google UK English Male', 'Microsoft George', 'Gordon', 'Oliver'],
+    stereoPan: 0.6
   }
 };
 
 /**
- * Play soft chime using Web Audio API for speaker attention
+ * Play soft chime using Web Audio API for speaker attention, spatialized via StereoPannerNode
  */
-export function playSoftChime(): void {
+export function playSoftChime(speakerId?: string): void {
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
@@ -70,7 +77,17 @@ export function playSoftChime(): void {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+
+    // R4: Spatial stereo panning
+    if (speakerId && ctx.createStereoPanner) {
+      const pan = ctx.createStereoPanner();
+      const config = PERSONA_VOICE_CONFIGS[speakerId] || PERSONA_VOICE_CONFIGS.moderator;
+      pan.pan.setValueAtTime(config.stereoPan ?? 0.0, ctx.currentTime);
+      gain.connect(pan);
+      pan.connect(ctx.destination);
+    } else {
+      gain.connect(ctx.destination);
+    }
 
     osc.start();
     osc.stop(ctx.currentTime + 0.35);
@@ -80,7 +97,60 @@ export function playSoftChime(): void {
 }
 
 /**
- * Speak text using browser SpeechSynthesis with persona voice mapping
+ * R4: Emit a sub-second backchannel reaction clip at -18dB under the main audio
+ */
+export function emitBackchannel(speakerId: string, move: string): void {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+  const phraseMap: Record<string, string[]> = {
+    AGREE: ['mm-hm', 'exactly'],
+    DISAGREE: ['hmm', 'wait—'],
+    BUILD: ['right', 'yeah'],
+    NEW_ANGLE: ['hmm', 'interesting'],
+    ASK_EVIDENCE: ['wait—', 'really?'],
+    INTERRUPT: ['wait—'],
+    CONCEDE: ['fair enough', 'mm-hm']
+  };
+
+  const phrases = phraseMap[move] || ['mm-hm'];
+  const text = phrases[Math.floor(Math.random() * phrases.length)];
+  const config = PERSONA_VOICE_CONFIGS[speakerId] || PERSONA_VOICE_CONFIGS.moderator;
+
+  try {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.pitch = config.pitch;
+    utterance.rate = config.rate * 1.15;
+    utterance.volume = 0.125; // -18dB relative to full scale
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      const chosenVoice = voices.find(v => 
+        config.preferredVoiceNames.some(name => v.name.toLowerCase().includes(name.toLowerCase()))
+      );
+      if (chosenVoice) utterance.voice = chosenVoice;
+    }
+
+    console.log(`[Backchannel] 🎙️ ${speakerId} reacted softly: "${text}" at -18dB`);
+    window.speechSynthesis.speak(utterance);
+  } catch (err) {
+    // Non-fatal
+  }
+}
+
+export interface SpeechPlaybackControl {
+  cancel: () => void;
+  cutAtSentenceBoundary: (onCut: () => void) => void;
+}
+
+export function splitSentences(text: string): string[] {
+  const matches = text.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g);
+  if (!matches) return [text];
+  return matches.map(s => s.trim()).filter(s => s.length > 0);
+}
+
+/**
+ * Speak text using browser SpeechSynthesis with persona voice mapping.
+ * Speaks sentence-by-sentence to allow graceful cuts at sentence boundaries on AI interruption.
  */
 export function speakWithBrowserTts(
   text: string,
@@ -88,79 +158,110 @@ export function speakWithBrowserTts(
   onStart?: () => void,
   onEnd?: () => void,
   onError?: (err: any) => void
-): () => void {
+): SpeechPlaybackControl {
   if (typeof window === 'undefined' || !window.speechSynthesis) {
     playSoftChime();
     onStart?.();
-    setTimeout(() => onEnd?.(), 1500);
-    return () => {};
+    const t = setTimeout(() => onEnd?.(), 1500);
+    return {
+      cancel: () => clearTimeout(t),
+      cutAtSentenceBoundary: (onCut) => { clearTimeout(t); onCut(); }
+    };
   }
 
   // Cancel any prior speech
   window.speechSynthesis.cancel();
 
-  const utterance = new SpeechSynthesisUtterance(text);
+  const sentences = splitSentences(text);
   const config = PERSONA_VOICE_CONFIGS[speakerId] || PERSONA_VOICE_CONFIGS.moderator;
 
-  utterance.pitch = config.pitch;
-  utterance.rate = config.rate;
+  let currentIndex = 0;
+  let isCancelled = false;
+  let cutCallback: (() => void) | null = null;
+  let hasStarted = false;
 
-  // Pick best matching voice
-  const voices = window.speechSynthesis.getVoices();
-  if (voices.length > 0) {
-    let chosenVoice = voices.find(v => 
-      config.preferredVoiceNames.some(name => v.name.toLowerCase().includes(name.toLowerCase()))
-    );
+  function speakNextSentence() {
+    if (isCancelled) return;
 
-    // Fallback by gender/accent
-    if (!chosenVoice) {
-      chosenVoice = voices.find(v => 
-        (v.lang.startsWith('en') || v.lang.startsWith('hi')) &&
-        (config.gender === 'female' ? v.name.toLowerCase().includes('female') : v.name.toLowerCase().includes('male'))
+    if (cutCallback) {
+      console.log('[BrowserTTS] ✂️ Reached sentence boundary. Halting speech gracefully.');
+      const cb = cutCallback;
+      cutCallback = null;
+      cb();
+      return;
+    }
+
+    if (currentIndex >= sentences.length) {
+      onEnd?.();
+      return;
+    }
+
+    const sentence = sentences[currentIndex];
+    const utterance = new SpeechSynthesisUtterance(sentence);
+    utterance.pitch = config.pitch;
+    utterance.rate = config.rate;
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      let chosenVoice = voices.find(v => 
+        config.preferredVoiceNames.some(name => v.name.toLowerCase().includes(name.toLowerCase()))
       );
+
+      if (!chosenVoice) {
+        chosenVoice = voices.find(v => 
+          (v.lang.startsWith('en') || v.lang.startsWith('hi')) &&
+          (config.gender === 'female' ? v.name.toLowerCase().includes('female') : v.name.toLowerCase().includes('male'))
+        );
+      }
+
+      if (!chosenVoice) {
+        chosenVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+      }
+
+      if (chosenVoice) {
+        utterance.voice = chosenVoice;
+      }
     }
 
-    if (!chosenVoice) {
-      chosenVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
-    }
+    utterance.onstart = () => {
+      if (!hasStarted) {
+        hasStarted = true;
+        onStart?.();
+      }
+    };
 
-    if (chosenVoice) {
-      utterance.voice = chosenVoice;
-    }
-  }
+    utterance.onend = () => {
+      currentIndex++;
+      speakNextSentence();
+    };
 
-  utterance.onstart = () => {
-    onStart?.();
-  };
+    utterance.onerror = (e) => {
+      if (e.error === 'interrupted' || e.error === 'canceled') {
+        return;
+      }
+      currentIndex++;
+      speakNextSentence();
+    };
 
-  utterance.onend = () => {
-    onEnd?.();
-  };
-
-  utterance.onerror = (e) => {
-    console.warn('[BrowserTTS] Error or interrupted:', e);
-    // If canceled/interrupted, don't trigger fatal error
-    if (e.error === 'interrupted' || e.error === 'canceled') {
-      onEnd?.();
-    } else {
-      playSoftChime();
-      onError?.(e);
-      onEnd?.();
-    }
-  };
-
-  try {
-    window.speechSynthesis.speak(utterance);
-  } catch (err) {
-    playSoftChime();
-    onStart?.();
-    setTimeout(() => onEnd?.(), 1500);
-  }
-
-  // Return cancel function
-  return () => {
     try {
-      window.speechSynthesis.cancel();
-    } catch {}
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      currentIndex++;
+      speakNextSentence();
+    }
+  }
+
+  speakNextSentence();
+
+  return {
+    cancel: () => {
+      isCancelled = true;
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    },
+    cutAtSentenceBoundary: (onCut: () => void) => {
+      cutCallback = onCut;
+    }
   };
 }

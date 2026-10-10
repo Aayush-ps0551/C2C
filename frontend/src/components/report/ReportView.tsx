@@ -271,28 +271,78 @@ export const ReportView: React.FC<ReportViewProps> = ({ sessionId, onRetry, onBa
           })}
         </div>
 
-        {/* Tactical Key Metrics Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800">
+        {/* Tactical Key Metrics Cards (Section 4C Realism Dynamics) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mt-6 pt-6 border-t border-slate-800">
           <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
             <span className="text-[10px] text-slate-400 uppercase font-semibold block">First to Speak</span>
-            <span className="text-sm font-bold text-white mt-1 block">{report.metrics.firstToSpeak}</span>
+            <span className="text-sm font-bold text-white mt-1 block truncate">{report.metrics.firstToSpeak}</span>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
-            <span className="text-[10px] text-slate-400 uppercase font-semibold block">Interruptions Made</span>
-            <span className="text-sm font-bold text-emerald-400 mt-1 block">{report.metrics.interruptionsMade}</span>
+            <span className="text-[10px] text-slate-400 uppercase font-semibold block">Interrupts Won/Lost</span>
+            <span className="text-sm font-bold text-emerald-400 mt-1 block">
+              {report.metrics.interruptionsWon ?? 0} <span className="text-xs text-slate-500 font-normal">/</span> <span className="text-rose-400">{report.metrics.interruptionsLost ?? report.metrics.interruptionsFaced ?? 0}</span>
+            </span>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
-            <span className="text-[10px] text-slate-400 uppercase font-semibold block">Interruptions Faced</span>
-            <span className="text-sm font-bold text-rose-400 mt-1 block">{report.metrics.interruptionsFaced}</span>
+            <span className="text-[10px] text-slate-400 uppercase font-semibold block">Times Talked Over</span>
+            <span className={`text-sm font-bold mt-1 block ${(report.metrics.timesTalkedOver ?? 0) > 0 ? 'text-amber-400' : 'text-slate-300'}`}>
+              {report.metrics.timesTalkedOver ?? 0}
+            </span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
+            <span className="text-[10px] text-slate-400 uppercase font-semibold block">Points Left Hanging</span>
+            <span className="text-sm font-bold text-purple-400 mt-1 block">
+              {report.metrics.pointsLeftHanging ?? 0}
+            </span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
+            <span className="text-[10px] text-slate-400 uppercase font-semibold block">Concessions Forced</span>
+            <span className="text-sm font-bold text-blue-400 mt-1 block">
+              {report.metrics.concessionsForced ?? 0}
+            </span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
+            <span className="text-[10px] text-slate-400 uppercase font-semibold block">Duel Involvement</span>
+            <span className="text-sm font-bold text-cyan-400 mt-1 block">
+              {report.metrics.duelInvolvement ?? 0}
+            </span>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-center">
             <span className="text-[10px] text-slate-400 uppercase font-semibold block">Filler Words</span>
-            <span className="text-sm font-bold text-amber-400 mt-1 block">{report.metrics.fillerWordCount}</span>
+            <span className="text-sm font-bold text-amber-400 mt-1 block">
+              {report.metrics.fillerWordCount ?? 0}
+            </span>
           </div>
         </div>
+
+        {/* R3 / R8: Best Moment Showcase */}
+        {report.metrics.bestMoment && (
+          <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/30">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                <span>Strongest Discussion Moment (Recruiter Highlight)</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                Turn #{report.metrics.bestMoment.turnIdx} • {report.metrics.bestMoment.speakerName}
+              </span>
+            </div>
+            <p className="text-xs italic text-slate-200">
+              "{report.metrics.bestMoment.text}"
+            </p>
+            {report.metrics.bestMoment.point && (
+              <span className="block text-[11px] text-purple-300 mt-1 font-medium">
+                Core Stance: {report.metrics.bestMoment.point}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 3. GROUPED QUOTE-LINKED FEEDBACK CARDS */}

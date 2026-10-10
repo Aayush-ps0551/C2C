@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { TOPIC_PRESETS, TopicPreset } from '../../lib/topics';
 import { PERSONAS, selectRandomPanel } from '../../lib/personas';
-import { TopicType, LanguageMode, SessionSettings } from '../../lib/types';
+import { TopicType, LanguageMode, SessionSettings, RoomIntensity } from '../../lib/types';
 
 interface LobbyViewProps {
   onStartSession: (topic: string, topicType: TopicType, caseBrief?: string, settings?: Partial<SessionSettings>) => void;
@@ -37,6 +37,8 @@ export const LobbyView: React.FC<LobbyViewProps> = ({ onStartSession, onViewHist
   const [durationMinutes, setDurationMinutes] = useState<number>(8);
   const [patienceMs, setPatienceMs] = useState<number>(1500);
   const [nudgeSecs, setNudgeSecs] = useState<number>(90);
+  const [intensity, setIntensity] = useState<RoomIntensity>('REAL_GD');
+  const [openingRoundEnabled, setOpeningRoundEnabled] = useState<boolean>(true);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   // Mic check states: 'checking' | 'ready' | 'denied' | 'unsupported'
@@ -94,7 +96,9 @@ export const LobbyView: React.FC<LobbyViewProps> = ({ onStartSession, onViewHist
       durationMinutes,
       patienceMs,
       nudgeSecs,
-      languageMode
+      languageMode,
+      intensity,
+      openingRoundEnabled
     });
   };
 
@@ -349,6 +353,66 @@ export const LobbyView: React.FC<LobbyViewProps> = ({ onStartSession, onViewHist
                 }`}
               >
                 {languageMode}
+              </button>
+            </div>
+
+            {/* Room Intensity Selector (R0 Realism Dial) */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  <Flame className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Room Intensity</span>
+                </span>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                  intensity === 'CAMPUS_MOCK' ? 'bg-emerald-500/20 text-emerald-300' :
+                  intensity === 'REAL_GD' ? 'bg-blue-500/20 text-blue-300' :
+                  'bg-rose-500/20 text-rose-300'
+                }`}>
+                  {intensity === 'CAMPUS_MOCK' ? 'Beginner' : intensity === 'REAL_GD' ? 'Realistic GD' : 'Brutal Placement'}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { id: 'CAMPUS_MOCK', label: 'Campus Mock', desc: 'Zero interrupts, 12s floor' },
+                  { id: 'REAL_GD', label: 'Real GD', desc: '≤1 int/45s, 7s floor, natural' },
+                  { id: 'PLACEMENT_BRUTAL', label: 'Brutal GD', desc: '≤1 int/20s, 4s floor, pressure' }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setIntensity(item.id as RoomIntensity)}
+                    className={`p-2 rounded-xl text-left border transition-all ${
+                      intensity === item.id
+                        ? item.id === 'CAMPUS_MOCK' 
+                          ? 'bg-emerald-500/15 border-emerald-400 text-emerald-200 shadow-sm'
+                          : item.id === 'REAL_GD'
+                          ? 'bg-blue-600/20 border-blue-400 text-blue-200 shadow-sm'
+                          : 'bg-rose-500/20 border-rose-400 text-rose-200 shadow-sm'
+                        : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <span className="text-[11px] font-bold block">{item.label}</span>
+                    <span className="text-[9px] text-slate-400 block mt-0.5 leading-tight">{item.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Opening Round Toggle (R1 Discussion Arc) */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800 mb-4">
+              <div>
+                <span className="text-xs font-bold text-white block">Opening Round (Stance)</span>
+                <span className="text-[10px] text-slate-400">15–25s stance per speaker; 5s student timeout</span>
+              </div>
+              <button
+                onClick={() => setOpeningRoundEnabled(!openingRoundEnabled)}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition ${
+                  openingRoundEnabled
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-slate-800 text-slate-500'
+                }`}
+              >
+                {openingRoundEnabled ? 'ACTIVE' : 'OFF'}
               </button>
             </div>
 

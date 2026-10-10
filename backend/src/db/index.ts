@@ -1,19 +1,31 @@
-import { supabase, isSupabaseConfigured } from './supabase';
+import { getSupabase } from './supabase';
 import { Session, Turn, ReportData } from '../lib/types';
+import { randomUUID } from 'crypto';
 
 // In-memory fallback stores for offline/local resilience
 const inMemorySessions = new Map<string, Session>();
 const inMemoryTurns = new Map<string, Turn[]>();
 const inMemoryReports = new Map<string, ReportData>();
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function ensureUuid(id?: string): string {
+  if (id && UUID_REGEX.test(id)) return id;
+  return randomUUID();
+}
+
 export async function createSessionDb(session: Session): Promise<Session> {
-  // Always keep in local memory
+  // Ensure valid UUID for Supabase PostgreSQL compatibility
+  session.id = ensureUuid(session.id);
+
+  // Keep in local memory
   inMemorySessions.set(session.id, session);
   inMemoryTurns.set(session.id, []);
 
-  if (isSupabaseConfigured && supabase) {
+  const client = getSupabase();
+  if (client) {
     try {
-      const { error } = await supabase.from('sessions').insert({
+      const { data, error } = await client.from('sessions').insert({
         id: session.id,
         topic: session.topic,
         topic_type: session.topicType,
@@ -25,22 +37,28 @@ export async function createSessionDb(session: Session): Promise<Session> {
         status: session.status,
         duration_sec: session.durationSec,
         created_at: session.createdAt
-      });
+      }).select();
+
       if (error) {
-        console.warn('[Supabase] Failed to insert session, using local store:', error.message);
+        console.error('[Supabase] Failed to insert session:', error.message, error.details);
+      } else {
+        console.log('[Supabase] Successfully saved session to database:', session.id);
       }
     } catch (err: any) {
-      console.warn('[Supabase] Exception inserting session:', err.message);
+      console.error('[Supabase] Exception inserting session:', err.message);
     }
+  } else {
+    console.warn('[Supabase] Client not configured. Using local memory store.');
   }
 
   return session;
 }
 
 export async function getSessionDb(id: string): Promise<Session | null> {
-  if (isSupabaseConfigured && supabase) {
+  const client = getSupabase();
+  if (client && UUID_REGEX.test(id)) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('sessions')
         .select('*')
         .eq('id', id)
@@ -63,7 +81,7 @@ export async function getSessionDb(id: string): Promise<Session | null> {
         };
       }
     } catch (err: any) {
-      console.warn('[Supabase] Failed to get session, falling back to local memory:', err.message);
+      console.warn('[Supabase] Exception fetching session, falling back to local memory:', err.message);
     }
   }
 
@@ -71,14 +89,15 @@ export async function getSessionDb(id: string): Promise<Session | null> {
 }
 
 export async function listSessionsDb(): Promise<Session[]> {
-  if (isSupabaseConfigured && supabase) {
+  const client = getSupabase();
+  if (client) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('sessions')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data.map(d => ({
           id: d.id,
           topic: d.topic,
@@ -95,7 +114,7 @@ export async function listSessionsDb(): Promise<Session[]> {
         }));
       }
     } catch (err: any) {
-      console.warn('[Supabase] Failed to list sessions, using local memory:', err.message);
+      console.warn('[Supabase] Exception listing sessions:', err.message);
     }
   }
 
@@ -116,9 +135,10 @@ export async function updateSessionStatusDb(
     local.endedAt = new Date().toISOString();
   }
 
-  if (isSupabaseConfigured && supabase) {
+  const client = getSupabase();
+  if (client && UUID_REGEX.test(id)) {
     try {
-      await supabase
+      const { error } = await client
         .from('sessions')
         .update({
           status,
@@ -126,20 +146,30 @@ export async function updateSessionStatusDb(
           ended_at: new Date().toISOString()
         })
         .eq('id', id);
+
+      if (error) {
+        console.error('[Supabase] Failed to update session status:', error.message);
+      } else {
+        console.log('[Supabase] Session status updated:', id, status);
+      }
     } catch (err: any) {
-      console.warn('[Supabase] Update status failed:', err.message);
+      console.error('[Supabase] Exception updating session status:', err.message);
     }
   }
 }
 
 export async function addTurnDb(turn: Turn): Promise<void> {
+  turn.id = ensureUuid(turn.id);
+  turn.sessionId = ensureUuid(turn.sessionId);
+
   const turns = inMemoryTurns.get(turn.sessionId) || [];
   turns.push(turn);
   inMemoryTurns.set(turn.sessionId, turns);
 
-  if (isSupabaseConfigured && supabase) {
+  const client = getSupabase();
+  if (client) {
     try {
-      await supabase.from('turns').insert({
+      const { error } = await client.from('turns').insert({
         id: turn.id,
         session_id: turn.sessionId,
         idx: turn.idx,
@@ -155,16 +185,23 @@ export async function addTurnDb(turn: Turn): Promise<void> {
         mode: turn.mode,
         created_at: turn.createdAt || new Date().toISOString()
       });
+
+      if (error) {
+        console.error('[Supabase] Failed to insert turn:', error.message, error.details);
+      } else {
+        console.log('[Supabase] Successfully saved turn to database:', turn.id, turn.speakerName);
+      }
     } catch (err: any) {
-      console.warn('[Supabase] Add turn failed:', err.message);
+      console.error('[Supabase] Exception inserting turn:', err.message);
     }
   }
 }
 
 export async function getTurnsDb(sessionId: string): Promise<Turn[]> {
-  if (isSupabaseConfigured && supabase) {
+  const client = getSupabase();
+  if (client && UUID_REGEX.test(sessionId)) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('turns')
         .select('*')
         .eq('session_id', sessionId)
@@ -189,7 +226,7 @@ export async function getTurnsDb(sessionId: string): Promise<Turn[]> {
         }));
       }
     } catch (err: any) {
-      console.warn('[Supabase] Get turns failed:', err.message);
+      console.warn('[Supabase] Exception fetching turns:', err.message);
     }
   }
 
@@ -197,11 +234,15 @@ export async function getTurnsDb(sessionId: string): Promise<Turn[]> {
 }
 
 export async function saveReportDb(report: ReportData): Promise<void> {
+  report.id = ensureUuid(report.id);
+  report.sessionId = ensureUuid(report.sessionId);
+
   inMemoryReports.set(report.sessionId, report);
 
-  if (isSupabaseConfigured && supabase) {
+  const client = getSupabase();
+  if (client) {
     try {
-      await supabase.from('reports').upsert({
+      const { error } = await client.from('reports').upsert({
         id: report.id,
         session_id: report.sessionId,
         overall_score: report.overallScore,
@@ -211,16 +252,23 @@ export async function saveReportDb(report: ReportData): Promise<void> {
         summary: report.summary,
         created_at: report.createdAt
       });
+
+      if (error) {
+        console.error('[Supabase] Failed to save report:', error.message, error.details);
+      } else {
+        console.log('[Supabase] Successfully saved report to database for session:', report.sessionId);
+      }
     } catch (err: any) {
-      console.warn('[Supabase] Save report failed:', err.message);
+      console.error('[Supabase] Exception saving report:', err.message);
     }
   }
 }
 
 export async function getReportDb(sessionId: string): Promise<ReportData | null> {
-  if (isSupabaseConfigured && supabase) {
+  const client = getSupabase();
+  if (client && UUID_REGEX.test(sessionId)) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('reports')
         .select('*')
         .eq('session_id', sessionId)
@@ -239,7 +287,7 @@ export async function getReportDb(sessionId: string): Promise<ReportData | null>
         };
       }
     } catch (err: any) {
-      console.warn('[Supabase] Get report failed:', err.message);
+      console.warn('[Supabase] Exception fetching report:', err.message);
     }
   }
 

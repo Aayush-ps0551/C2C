@@ -1,4 +1,4 @@
-import { speakWithBrowserTts } from './tts';
+import { speakWithBrowserTts, SpeechPlaybackControl } from './tts';
 
 export interface QueueItem {
   id: string;
@@ -15,6 +15,7 @@ export class AudioPlaybackQueue {
   private queue: QueueItem[] = [];
   private isPlaying = false;
   private currentItem: QueueItem | null = null;
+  private playbackControl: SpeechPlaybackControl | null = null;
   private cancelCurrentSpeech: (() => void) | null = null;
   private audioElement: HTMLAudioElement | null = null;
 
@@ -33,10 +34,19 @@ export class AudioPlaybackQueue {
     return this.currentItem?.speakerId || null;
   }
 
+  public getCurrentItem(): QueueItem | null {
+    return this.currentItem;
+  }
+
   /**
    * Barge-in handler: Immediately stops active speech, cancels queue, and marks current turn interrupted
    */
   public stopImmediate(wasInterrupted = false): void {
+    if (this.playbackControl) {
+      this.playbackControl.cancel();
+      this.playbackControl = null;
+    }
+
     if (this.cancelCurrentSpeech) {
       this.cancelCurrentSpeech();
       this.cancelCurrentSpeech = null;
@@ -59,6 +69,32 @@ export class AudioPlaybackQueue {
     this.queue = [];
     this.isPlaying = false;
     this.currentItem = null;
+  }
+
+  /**
+   * AI Interruption handler: cuts current speaker's audio at the NEXT SENTENCE BOUNDARY (not mid-word)
+   */
+  public cutAtNextSentenceBoundary(onCut: () => void): boolean {
+    if (!this.isPlaying || !this.currentItem) {
+      return false;
+    }
+
+    const current = this.currentItem;
+    if (this.playbackControl) {
+      console.log(`[AudioQueue] ⚡ Interruption scheduled for ${current.speakerName}. Cutting at sentence boundary.`);
+      this.playbackControl.cutAtSentenceBoundary(() => {
+        current.onInterrupted?.();
+        this.isPlaying = false;
+        this.currentItem = null;
+        this.playbackControl = null;
+        onCut();
+      });
+      return true;
+    } else {
+      this.stopImmediate(true);
+      onCut();
+      return true;
+    }
   }
 
   private playNext(): void {
@@ -104,18 +140,18 @@ export class AudioPlaybackQueue {
   }
 
   private fallbackToBrowserSpeech(item: QueueItem): void {
-    this.cancelCurrentSpeech = speakWithBrowserTts(
+    this.playbackControl = speakWithBrowserTts(
       item.text,
       item.speakerId,
       undefined,
       () => {
-        this.cancelCurrentSpeech = null;
+        this.playbackControl = null;
         item.onEnd?.();
         // 400-700ms conversational pause
         setTimeout(() => this.playNext(), 500);
       },
       () => {
-        this.cancelCurrentSpeech = null;
+        this.playbackControl = null;
         item.onEnd?.();
         setTimeout(() => this.playNext(), 500);
       }

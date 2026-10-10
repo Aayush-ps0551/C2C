@@ -1,23 +1,33 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { executeAiCompletion, extractAndParseJson } from '../ai/openrouter';
-import { saveReportDb, getReportDb, getTurnsDb, getSessionDb } from '../db';
+import { saveReportDb, getReportDb, getTurnsDb, getSessionDb, ensureUuid } from '../db';
 import { Turn, ReportData, ReportMetrics, FeedbackItem, MissedOpening } from '../lib/types';
+import { randomUUID } from 'crypto';
 
 const router = Router();
 
 const ReportRequestSchema = z.object({
   sessionId: z.string(),
   transcript: z.array(z.any()).default([]),
-  durationSec: z.number().default(0)
+  durationSec: z.number().default(0),
+  events: z.array(z.any()).optional().default([]),
+  notableMoments: z.array(z.any()).optional().default([])
 });
 
-// Helper to calculate deterministic metrics from transcript
-function calculateMetrics(turns: Turn[], durationSec: number): ReportMetrics {
+// Helper to calculate deterministic metrics from transcript and events
+function calculateMetrics(
+  turns: Turn[], 
+  durationSec: number,
+  events: any[] = [],
+  notableMoments: any[] = []
+): ReportMetrics {
   const speakTimeBySpeaker: Record<string, number> = {};
   const turnCounts: Record<string, number> = {};
   let interruptionsMade = 0;
   let interruptionsFaced = 0;
+  let interruptionsWon = 0;
+  let interruptionsLost = 0;
   let studentTotalWords = 0;
   let studentTurnCount = 0;
   let fillerWordCount = 0;
@@ -25,7 +35,7 @@ function calculateMetrics(turns: Turn[], durationSec: number): ReportMetrics {
 
   const fillerRegex = /\b(um|uh|like|you know|basically|actually|sort of|kind of|i mean)\b/gi;
 
-  turns.forEach((t, index) => {
+  turns.forEach((t) => {
     // Track first non-moderator speaker
     if (firstToSpeak === 'None' && t.speakerType !== 'MODERATOR') {
       firstToSpeak = t.speakerName;
@@ -54,13 +64,13 @@ function calculateMetrics(turns: Turn[], durationSec: number): ReportMetrics {
 
       if (t.wasBargeIn) {
         interruptionsMade++;
+        if (!t.wasInterrupted) {
+          interruptionsWon++;
+        }
       }
       if (t.wasInterrupted) {
         interruptionsFaced++;
-      }
-    } else {
-      if (t.wasInterrupted) {
-        // Someone interrupted this AI
+        interruptionsLost++;
       }
     }
   });
@@ -69,21 +79,49 @@ function calculateMetrics(turns: Turn[], durationSec: number): ReportMetrics {
     ? Math.round(studentTotalWords / studentTurnCount) 
     : 0;
 
+  const timesTalkedOver = events.filter(e => e.type === 'TALKED_OVER_STUDENT').length;
+  const concessionsForced = events.filter(e => e.type === 'CONCESSION' && (e.meta?.forcedBy === 'student' || e.meta?.target === 'student')).length;
+  const duelInvolvement = events.filter(e => e.type === 'DUEL_DETECTED' && (e.meta?.speakers?.includes('student') || e.meta?.speakers?.includes('You (Student)'))).length;
+  const pointsLeftHanging = events.filter(e => e.type === 'RE_RAISED_POINT' && e.meta?.speakerId === 'student').length;
+
+  let bestMoment: any = undefined;
+  if (notableMoments && notableMoments.length > 0) {
+    bestMoment = notableMoments.find(m => m.speakerId === 'student' || (m.speakerName && m.speakerName.toLowerCase().includes('student'))) || notableMoments[0];
+  } else {
+    const studentTurn = turns.find(t => t.speakerType === 'STUDENT' && t.text.length > 40) || turns.find(t => t.speakerType === 'STUDENT');
+    if (studentTurn) {
+      bestMoment = {
+        speakerId: 'student',
+        speakerName: 'You (Student)',
+        turnIdx: studentTurn.idx,
+        text: studentTurn.text,
+        point: studentTurn.text.slice(0, 80)
+      };
+    }
+  }
+
   return {
     speakTimeBySpeaker,
     turnCounts,
     interruptionsMade,
     interruptionsFaced,
+    interruptionsWon,
+    interruptionsLost,
+    timesTalkedOver,
+    pointsLeftHanging,
+    concessionsForced,
+    duelInvolvement,
     avgTurnLength,
     firstToSpeak,
-    fillerWordCount
+    fillerWordCount,
+    bestMoment
   };
 }
 
 // POST /api/report - Generate and save feedback report
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { sessionId, durationSec } = ReportRequestSchema.parse(req.body);
+    const { sessionId, durationSec, events, notableMoments } = ReportRequestSchema.parse(req.body);
 
     let turns = req.body.transcript as Turn[];
     if (!turns || turns.length === 0) {
@@ -101,7 +139,7 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
-    const metrics = calculateMetrics(turns, durationSec);
+    const metrics = calculateMetrics(turns, durationSec, events, notableMoments);
 
     // Check if report already generated
     const existing = await getReportDb(sessionId);
@@ -115,7 +153,7 @@ router.post('/', async (req: Request, res: Response) => {
       `Turn ${i} [${t.speakerName} (${t.speakerType}) at ${Math.floor(t.startMs / 1000)}s]: "${t.text}"`
     ).join('\n');
 
-    const hasKeys = Boolean(process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY);
+    const hasKeys = Boolean(process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY !== 'your_openrouter_api_key_here');
 
     let feedback: FeedbackItem[] = [];
     let missedOpenings: MissedOpening[] = [];
@@ -306,12 +344,13 @@ Return strict JSON:
     }
 
     const reportData: ReportData = {
-      id: 'rep_' + Math.random().toString(36).substring(2, 10),
-      sessionId,
+      id: randomUUID(),
+      sessionId: ensureUuid(sessionId),
       overallScore,
       metrics,
       feedback,
       missedOpenings,
+      events,
       summary: {
         score0to100: overallScore,
         strengths,

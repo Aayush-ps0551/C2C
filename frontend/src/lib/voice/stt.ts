@@ -16,7 +16,7 @@ export interface SttConfig {
 
 export class SpeechToTextEngine {
   private recognition: any = null;
-  private isListening = false;
+  public isListening = false;
   private silenceTimer: any = null;
   private currentTranscript = '';
   private config: SttConfig;
@@ -39,6 +39,8 @@ export class SpeechToTextEngine {
         this.recognition.interimResults = true;
         this.recognition.lang = config.language || 'en-IN';
         this.setupHandlers();
+      } else {
+        console.warn('[STT] Browser does not support Web Speech API');
       }
     }
   }
@@ -49,6 +51,10 @@ export class SpeechToTextEngine {
 
   private setupHandlers(): void {
     if (!this.recognition) return;
+
+    this.recognition.onstart = () => {
+      console.log('[STT Engine] 🎙️ Speech recognition started and active');
+    };
 
     this.recognition.onresult = (event: any) => {
       let interim = '';
@@ -64,18 +70,19 @@ export class SpeechToTextEngine {
       }
 
       if (finalStr) {
-        this.currentTranscript += ' ' + finalStr;
-        this.callbacks.onFinalResult(this.currentTranscript.trim());
+        this.currentTranscript = (this.currentTranscript + ' ' + finalStr).trim();
+        console.log('[STT Final]', this.currentTranscript);
+        this.callbacks.onFinalResult(this.currentTranscript);
       } else if (interim) {
-        this.callbacks.onInterimResult((this.currentTranscript + ' ' + interim).trim());
+        const fullInterim = (this.currentTranscript + ' ' + interim).trim();
+        this.callbacks.onInterimResult(fullInterim);
       }
 
-      // Reset patience timer on speech activity
+      // Reset patience timer on active speech
       this.resetSilenceTimer();
     };
 
     this.recognition.onerror = (event: any) => {
-      // Ignore routine abort/no-speech errors
       if (event.error === 'no-speech' || event.error === 'aborted') {
         return;
       }
@@ -84,11 +91,19 @@ export class SpeechToTextEngine {
     };
 
     this.recognition.onend = () => {
+      console.log('[STT Engine] Recognition ended. isListening =', this.isListening);
       if (this.isListening) {
-        // Auto-restart if still marked listening
+        // Automatically restart continuous listening
         try {
           this.recognition.start();
-        } catch {}
+        } catch (e) {
+          // Restart after short delay if busy
+          setTimeout(() => {
+            if (this.isListening) {
+              try { this.recognition.start(); } catch {}
+            }
+          }, 200);
+        }
       }
     };
   }
@@ -100,6 +115,7 @@ export class SpeechToTextEngine {
 
     this.silenceTimer = setTimeout(() => {
       if (this.currentTranscript.trim().length > 0) {
+        console.log('[STT] Silence threshold reached. Submitting turn:', this.currentTranscript.trim());
         const completed = this.currentTranscript.trim();
         this.currentTranscript = '';
         this.callbacks.onSilenceTimeout();
@@ -108,13 +124,14 @@ export class SpeechToTextEngine {
   }
 
   public start(): void {
-    if (!this.recognition || this.isListening) return;
+    if (!this.recognition) return;
     this.currentTranscript = '';
     this.isListening = true;
     try {
       this.recognition.start();
+      console.log('[STT] Starting speech recognition...');
     } catch (err) {
-      console.warn('[STT] Failed to start:', err);
+      console.warn('[STT] Start call caught:', err);
     }
   }
 
@@ -130,6 +147,7 @@ export class SpeechToTextEngine {
       } catch {}
     }
     this.currentTranscript = '';
+    console.log('[STT] Stopped listening');
   }
 
   public pause(): void {
@@ -137,18 +155,28 @@ export class SpeechToTextEngine {
       clearTimeout(this.silenceTimer);
       this.silenceTimer = null;
     }
-    if (this.recognition && this.isListening) {
+    if (this.recognition) {
       try {
         this.recognition.stop();
       } catch {}
     }
+    console.log('[STT] Paused listening during AI speech');
   }
 
   public resume(): void {
-    if (this.isListening && this.recognition) {
-      try {
-        this.recognition.start();
-      } catch {}
+    if (!this.recognition) return;
+    this.isListening = true;
+    this.currentTranscript = '';
+    try {
+      this.recognition.start();
+      console.log('[STT] Resumed listening for student input');
+    } catch (e) {
+      // If already started or aborting, retry shortly
+      setTimeout(() => {
+        if (this.isListening) {
+          try { this.recognition.start(); } catch {}
+        }
+      }, 150);
     }
   }
 }
