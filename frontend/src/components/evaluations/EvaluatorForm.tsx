@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save, CheckCircle2 } from 'lucide-react';
+import { apiUrl } from '../../lib/api';
 
 interface Criterion {
   id: string;
@@ -29,9 +30,9 @@ export const EvaluatorForm: React.FC<{ sessionId: string, evaluatorId: string, o
   useEffect(() => {
     // Fetch criteria and participants
     Promise.all([
-      fetch('http://localhost:5000/api/evaluations/criteria').then(r => r.json()),
+      fetch(apiUrl('/api/evaluations/criteria')).then(r => r.json()),
       // In a real app, we'd have a specific route to get participants for a session
-      fetch(`http://localhost:5000/api/evaluations/${sessionId}/results`).then(r => r.json())
+      fetch(apiUrl(`/api/evaluations/${sessionId}/results`)).then(r => r.json())
     ])
     .then(([critData, resultsData]) => {
       setCriteria(critData);
@@ -78,7 +79,7 @@ export const EvaluatorForm: React.FC<{ sessionId: string, evaluatorId: string, o
     }));
 
     try {
-      const res = await fetch('http://localhost:5000/api/evaluations/submit', {
+      const res = await fetch(apiUrl('/api/evaluations/submit'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Plus, Trash2, Save } from 'lucide-react';
+import { apiUrl } from '../../lib/api';
 
 interface Criterion {
   id?: string;
@@ -13,7 +14,7 @@ export const AdminCriteriaConfig: React.FC<{ onBack: () => void }> = ({ onBack }
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/evaluations/criteria')
+    fetch(apiUrl('/api/evaluations/criteria'))
       .then(r => r.json())
       .then(data => {
         if (data && data.length > 0) {
@@ -64,7 +65,7 @@ export const AdminCriteriaConfig: React.FC<{ onBack: () => void }> = ({ onBack }
 
     setSaving(true);
     try {
-      const res = await fetch('http://localhost:5000/api/evaluations/criteria', {
+      const res = await fetch(apiUrl('/api/evaluations/criteria'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ criteria })

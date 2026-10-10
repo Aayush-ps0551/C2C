@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Download, Users, BarChart } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { apiUrl } from '../../lib/api';
 
 interface Criterion {
   id: string;
@@ -27,11 +28,11 @@ export const EvaluationDashboard: React.FC<{ sessionId: string, onBack: () => vo
   useEffect(() => {
     // In a real implementation this would fetch from /api/evaluations/:sessionId/results
     // We mock it for the initial skeleton load until the backend is fully wired in
-    fetch(`http://localhost:5000/api/evaluations/criteria`)
+    fetch(apiUrl('/api/evaluations/criteria'))
       .then(r => r.json())
       .then(c => {
         setCriteria(c);
-        return fetch(`http://localhost:5000/api/evaluations/${sessionId}/results`);
+        return fetch(apiUrl(`/api/evaluations/${sessionId}/results`));
       })
       .then(r => r.json())
       .then(data => {

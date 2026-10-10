@@ -18,6 +18,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { ReportData, Turn } from '../../lib/types';
+import { apiUrl } from '../../lib/api';
 
 interface ReportViewProps {
   sessionId: string;
@@ -37,11 +38,11 @@ export const ReportView: React.FC<ReportViewProps> = ({ sessionId, onRetry, onBa
   useEffect(() => {
     // Fetch report data
     setIsLoading(true);
-    fetch(`/api/report/${sessionId}`)
+    fetch(apiUrl(`/api/report/${sessionId}`))
       .then(res => {
         if (!res.ok) {
           // If not created yet, request generation
-          return fetch('/api/report', {
+          return fetch(apiUrl('/api/report'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionId, durationSec: 480 })
@@ -68,7 +69,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ sessionId, onRetry, onBa
       });
 
     // Fetch session turns for transcript jump-links
-    fetch(`/api/sessions/${sessionId}`)
+    fetch(apiUrl(`/api/sessions/${sessionId}`))
       .then(res => res.json())
       .then(data => {
         if (data.turns) setTurns(data.turns);

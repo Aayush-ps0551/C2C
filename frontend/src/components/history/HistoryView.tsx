@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, BookOpen, Clock, Calendar, ChevronRight, Award } from 'lucide-react';
 import { Session } from '../../lib/types';
+import { apiUrl } from '../../lib/api';
 
 interface HistoryViewProps {
   onBackToLobby: () => void;
@@ -14,7 +15,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ onBackToLobby, onSelec
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/sessions')
+    fetch(apiUrl('/api/sessions'))
       .then(res => res.json())
       .then(data => {
         setSessions(data.sessions || []);
