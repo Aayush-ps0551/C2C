@@ -23,10 +23,10 @@ import { apiUrl } from '../../lib/api';
 interface ReportViewProps {
   sessionId: string;
   onRetry: () => void;
-  onBackToLobby: () => void;
+  onBackToMainScreen: () => void;
 }
 
-export const ReportView: React.FC<ReportViewProps> = ({ sessionId, onRetry, onBackToLobby }) => {
+export const ReportView: React.FC<ReportViewProps> = ({ sessionId, onRetry, onBackToMainScreen }) => {
   const [report, setReport] = useState<ReportData | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -126,10 +126,10 @@ export const ReportView: React.FC<ReportViewProps> = ({ sessionId, onRetry, onBa
         <h2 className="text-xl font-bold text-white mb-2">Report Not Found</h2>
         <p className="text-sm text-slate-400 mb-6">Insufficient turns were recorded to generate a full evaluation.</p>
         <button
-          onClick={onBackToLobby}
+          onClick={onBackToMainScreen}
           className="px-4 py-2 rounded-xl bg-blue-600 text-white font-semibold text-xs"
         >
-          Return to Lobby
+          Return to Main Screen
         </button>
       </div>
     );
@@ -143,11 +143,11 @@ export const ReportView: React.FC<ReportViewProps> = ({ sessionId, onRetry, onBa
       {/* Top Navigation */}
       <div className="flex items-center justify-between pb-4 border-b border-slate-800">
         <button
-          onClick={onBackToLobby}
+          onClick={onBackToMainScreen}
           className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Lobby</span>
+          <span>Back to Main Screen</span>
         </button>
 
         <div className="flex items-center gap-2">
@@ -474,6 +474,16 @@ export const ReportView: React.FC<ReportViewProps> = ({ sessionId, onRetry, onBa
             </div>
           ))}
         </div>
+      </div>
+
+      {/* 6. BOTTOM ACTION BUTTON */}
+      <div className="flex justify-center pt-8 pb-12">
+        <button
+          onClick={onBackToMainScreen}
+          className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 border border-blue-400/30 transition-all transform hover:scale-105"
+        >
+          Back to Main Screen
+        </button>
       </div>
     </div>
   );

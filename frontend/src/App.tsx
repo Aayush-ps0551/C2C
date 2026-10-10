@@ -92,7 +92,7 @@ export default function App() {
         <ReportView 
           sessionId={activeSessionId}
           onRetry={handleRetry}
-          onBackToLobby={handleBackToLobby}
+          onBackToMainScreen={handleBackToLobby}
         />
       )}
 
