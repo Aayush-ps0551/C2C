@@ -70,6 +70,7 @@ export interface Persona {
   ttsVoiceId: string;
   ttsStyleHint: string;
   params: PersonaParams;
+  fallbackLines: string[];
 }
 
 export interface SessionSettings {

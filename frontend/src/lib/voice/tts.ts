@@ -15,46 +15,74 @@ export interface PersonaVoiceConfig {
 
 export const PERSONA_VOICE_CONFIGS: Record<string, PersonaVoiceConfig> = {
   moderator: {
-    pitch: 1.0,
-    rate: 0.95,
-    gender: 'female',
+    pitch: 1.0, rate: 0.95, gender: 'female',
     preferredVoiceNames: ['Google UK English Female', 'Microsoft Zira', 'Samantha', 'Karen', 'Victoria'],
     stereoPan: 0.0
   },
-  aarav: {
-    pitch: 1.05,
-    rate: 1.15,
-    gender: 'male',
-    preferredVoiceNames: ['Google UK English Male', 'Microsoft David', 'Daniel', 'Alex', 'Rishi'],
-    stereoPan: -0.6
+  // SMALL ROOM
+  aarav: { // Male Dominator
+    pitch: 1.05, rate: 1.15, gender: 'male',
+    preferredVoiceNames: ['Google UK English Male', 'Microsoft David', 'Daniel', 'Alex', 'Rishi'], stereoPan: -0.6
   },
-  meera: {
-    pitch: 1.0,
-    rate: 1.05,
-    gender: 'female',
-    preferredVoiceNames: ['Google US English', 'Microsoft Jenny', 'Fiona', 'Moira', 'Veena'],
-    stereoPan: -0.3
+  neha: { // Female Analyst
+    pitch: 1.0, rate: 1.05, gender: 'female',
+    preferredVoiceNames: ['Google US English', 'Microsoft Jenny', 'Fiona', 'Moira', 'Veena'], stereoPan: -0.3
   },
-  rohan: {
-    pitch: 0.85,
-    rate: 0.88,
-    gender: 'male',
-    preferredVoiceNames: ['Google US English', 'Microsoft Mark', 'Fred', 'Arthur'],
-    stereoPan: 0.1
+  rohan: { // Male Thinker
+    pitch: 0.85, rate: 0.88, gender: 'male',
+    preferredVoiceNames: ['Google US English', 'Microsoft Mark', 'Fred', 'Arthur'], stereoPan: 0.1
   },
-  priya: {
-    pitch: 1.2,
-    rate: 1.08,
-    gender: 'female',
-    preferredVoiceNames: ['Google US English Female', 'Tessa', 'Princess', 'Kathy'],
-    stereoPan: 0.35
+  
+  // MEDIUM ROOM
+  kavya: { // Female Drifter
+    pitch: 1.2, rate: 1.08, gender: 'female',
+    preferredVoiceNames: ['Google US English Female', 'Tessa', 'Princess', 'Kathy'], stereoPan: 0.35
   },
-  vikram: {
-    pitch: 0.95,
-    rate: 0.98,
-    gender: 'male',
-    preferredVoiceNames: ['Google UK English Male', 'Microsoft George', 'Gordon', 'Oliver'],
-    stereoPan: 0.6
+  aditya: { // Male Devil
+    pitch: 0.95, rate: 0.98, gender: 'male',
+    preferredVoiceNames: ['Google UK English Male', 'Microsoft George', 'Gordon', 'Oliver'], stereoPan: 0.6
+  },
+  ishan: { // Male Dominator
+    pitch: 1.02, rate: 1.12, gender: 'male',
+    preferredVoiceNames: ['Google UK English Male', 'Microsoft David', 'Daniel'], stereoPan: -0.4
+  },
+  priya: { // Female Drifter
+    pitch: 1.15, rate: 1.05, gender: 'female',
+    preferredVoiceNames: ['Google US English Female', 'Tessa', 'Princess', 'Kathy'], stereoPan: -0.2
+  },
+  varun: { // Male Thinker
+    pitch: 0.88, rate: 0.90, gender: 'male',
+    preferredVoiceNames: ['Google US English', 'Microsoft Mark', 'Fred'], stereoPan: 0.4
+  },
+
+  // LARGE ROOM
+  sanya: { // Female Dominator
+    pitch: 1.08, rate: 1.15, gender: 'female',
+    preferredVoiceNames: ['Google UK English Female', 'Microsoft Zira', 'Samantha'], stereoPan: -0.6
+  },
+  kabir: { // Male Devil
+    pitch: 0.92, rate: 0.95, gender: 'male',
+    preferredVoiceNames: ['Google UK English Male', 'Microsoft George', 'Gordon'], stereoPan: -0.4
+  },
+  arjun: { // Male Thinker
+    pitch: 0.85, rate: 0.88, gender: 'male',
+    preferredVoiceNames: ['Google US English', 'Microsoft Mark', 'Fred'], stereoPan: -0.2
+  },
+  dev: { // Male Dominator
+    pitch: 1.05, rate: 1.15, gender: 'male',
+    preferredVoiceNames: ['Google UK English Male', 'Microsoft David', 'Daniel'], stereoPan: 0.1
+  },
+  meera: { // Female Analyst
+    pitch: 1.0, rate: 1.05, gender: 'female',
+    preferredVoiceNames: ['Google US English', 'Microsoft Jenny', 'Fiona'], stereoPan: 0.3
+  },
+  ritika: { // Female Drifter
+    pitch: 1.2, rate: 1.08, gender: 'female',
+    preferredVoiceNames: ['Google US English Female', 'Tessa', 'Princess'], stereoPan: 0.5
+  },
+  kunal: { // Male Devil
+    pitch: 0.95, rate: 0.98, gender: 'male',
+    preferredVoiceNames: ['Google UK English Male', 'Microsoft George', 'Oliver'], stereoPan: 0.7
   }
 };
 

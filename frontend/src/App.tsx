@@ -15,7 +15,14 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('MAP');
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  const { initializeSession, startDiscussion, resetStore } = useSessionStore();
+  const { initializeSession, startDiscussion, resetStore, phase, session } = useSessionStore();
+
+  React.useEffect(() => {
+    if (phase === 'REPORT' && session?.id) {
+      setActiveSessionId(session.id);
+      setCurrentScreen('REPORT');
+    }
+  }, [phase, session]);
 
   const handleStartSession = async (
     topic: string, 

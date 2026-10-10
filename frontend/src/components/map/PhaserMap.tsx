@@ -4,6 +4,7 @@ import { createGame } from '../../game/main';
 import { AuthModal } from '../auth/AuthModal';
 import { GDSettingsModal } from '../lobby/GDSettingsModal';
 import { BottomToolbar } from './BottomToolbar';
+import { useSessionStore } from '../../lib/fsm/useSessionStore';
 import { Settings, MapPin, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, buildUserProfile } from '../../lib/supabase';
@@ -32,6 +33,57 @@ export const PhaserMap: React.FC<PhaserMapProps> = ({ onInteract, onExit }) => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [savedSettings, setSavedSettings] = useState<any>(null);
+  const [currentRoom, setCurrentRoom] = useState<string>('lobby');
+  const [isGdActive, setIsGdActive] = useState<boolean>(false);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  const initializeSession = useSessionStore(s => s.initializeSession);
+  const startDiscussion = useSessionStore(s => s.startDiscussion);
+  const endSession = useSessionStore(s => s.endSession);
+  const currentSpeakerId = useSessionStore(s => s.currentSpeakerId);
+  const participantStatus = useSessionStore(s => s.participantStatus);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isGdActive && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            setIsGdActive(false);
+            endSession();
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isGdActive, timeLeft]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
+    const handleRoomChanged = (e: any) => {
+      setCurrentRoom(e.detail.room);
+    };
+    window.addEventListener('room-changed', handleRoomChanged);
+    return () => window.removeEventListener('room-changed', handleRoomChanged);
+  }, []);
+
+  const getTargetRoomId = () => {
+    if (!savedSettings) return null;
+    if (savedSettings.settings?.panelSize === 3) return 'small_gd';
+    if (savedSettings.settings?.panelSize === 5) return 'medium_gd';
+    if (savedSettings.settings?.panelSize === 7) return 'large_gd';
+    return null;
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -118,11 +170,34 @@ export const PhaserMap: React.FC<PhaserMapProps> = ({ onInteract, onExit }) => {
             scene.updateUserName(currentUser?.displayName || '');
           }
         }
+        // Map backend speaker ID to frontend game ID
+        if (scene.aiCharacters) {
+          const roomId = getTargetRoomId();
+          let prefix = '';
+          if (roomId === 'small_gd') prefix = 'small_';
+          if (roomId === 'medium_gd') prefix = 'med_';
+          if (roomId === 'large_gd') prefix = 'large_';
+          
+          scene.aiCharacters.forEach((char: any) => {
+            const rawId = char.id.replace(prefix, '');
+            let statusToSet = participantStatus[rawId] || 'idle';
+            
+            if (currentSpeakerId && currentSpeakerId !== 'student' && rawId === currentSpeakerId) {
+              statusToSet = 'speaking';
+            }
+            
+            if (char.setStatus) {
+              char.setStatus(statusToSet);
+            } else if (char.setSpeaking) {
+              char.setSpeaking(statusToSet === 'speaking');
+            }
+          });
+        }
       } catch (err) {
         console.warn('[Phaser Scene Sync]', err);
       }
     }
-  }, [currentUser]);
+  }, [currentUser, currentSpeakerId, participantStatus, savedSettings]);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-[#0b0f19]">
@@ -179,6 +254,45 @@ export const PhaserMap: React.FC<PhaserMapProps> = ({ onInteract, onExit }) => {
       {/* Optional Toolbar floating at bottom */}
       {currentUser && <BottomToolbar />}
 
+      {/* GD Start/End Button */}
+      {currentRoom !== 'lobby' && currentRoom === getTargetRoomId() && (
+        <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-[150] flex flex-col items-center gap-2">
+          {isGdActive && timeLeft > 0 && (
+            <div className="px-5 py-2 bg-slate-900/90 text-white font-mono text-2xl font-bold rounded-xl border border-slate-700/50 backdrop-blur-sm shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+              {formatTime(timeLeft)}
+            </div>
+          )}
+          <div className="px-4 py-1.5 bg-slate-900/90 text-slate-300 text-sm font-medium rounded-full border border-slate-700/50 backdrop-blur-sm">
+            {savedSettings?.topic}
+          </div>
+          {!isGdActive ? (
+            <button 
+              onClick={() => {
+                setIsGdActive(true);
+                if (savedSettings?.settings?.durationMinutes) {
+                  setTimeLeft(savedSettings.settings.durationMinutes * 60);
+                }
+                startDiscussion();
+              }}
+              className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(52,211,153,0.3)] border border-emerald-400/50 transition-all transform hover:scale-105"
+            >
+              Start GD
+            </button>
+          ) : (
+            <button 
+              onClick={() => {
+                setIsGdActive(false);
+                setTimeLeft(0);
+                endSession();
+              }}
+              className="px-8 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(244,63,94,0.3)] border border-red-400/50 transition-all transform hover:scale-105"
+            >
+              End GD
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Auth Modal at Spawn Point */}
       <AuthModal 
         isOpen={showAuthModal} 
@@ -192,8 +306,9 @@ export const PhaserMap: React.FC<PhaserMapProps> = ({ onInteract, onExit }) => {
       <GDSettingsModal 
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
-        onSave={(topic, type, brief, settings) => {
+        onSave={async (topic, type, brief, settings) => {
           setSavedSettings({ topic, type, brief, settings });
+          await initializeSession(topic, type, brief, settings);
           setShowSettingsModal(false);
           
           // Generate a dynamic direction based on panel size

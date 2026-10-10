@@ -13,6 +13,7 @@ export default class GameScene extends Phaser.Scene {
     this.player = null;
     this.userNameText = null;
     this.pendingUserName = null;
+    this.currentRoom = 'lobby';
   }
 
   create() {
@@ -208,6 +209,20 @@ export default class GameScene extends Phaser.Scene {
         if (this.player.x > this.spawnX + trapWidth) this.player.x = this.spawnX + trapWidth;
         if (this.player.y < this.spawnY - trapHeight) this.player.y = this.spawnY - trapHeight;
         if (this.player.y > this.spawnY + trapHeight) this.player.y = this.spawnY + trapHeight;
+      }
+
+      let newRoom = 'lobby';
+      if (this.player.x >= 96 && this.player.x <= 480 && this.player.y >= 128 && this.player.y <= 544) {
+        newRoom = 'small_gd';
+      } else if (this.player.x >= 992 && this.player.x <= 1568 && this.player.y >= 128 && this.player.y <= 544) {
+        newRoom = 'medium_gd';
+      } else if (this.player.x >= 1760 && this.player.x <= 2464 && this.player.y >= 128 && this.player.y <= 544) {
+        newRoom = 'large_gd';
+      }
+
+      if (this.currentRoom !== newRoom) {
+        this.currentRoom = newRoom;
+        window.dispatchEvent(new CustomEvent('room-changed', { detail: { room: newRoom } }));
       }
     }
   }
