@@ -23,6 +23,7 @@ import { emitBackchannel, playSoftChime } from '../voice/tts';
 import { arbitrateTurn, INTENSITY_PRESETS } from './arbiter';
 import { validateGrounding } from './grounding';
 import { detectCycles } from './cycles';
+import { apiUrl } from '../api';
 
 function generateUuid(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -186,7 +187,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ sessionEvents: [...state.sessionEvents, event] });
 
     if (state.session?.id) {
-      fetch(`/api/sessions/${state.session.id}/events`, {
+      fetch(apiUrl(`/api/sessions/${state.session.id}/events`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(event)
@@ -234,7 +235,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     let activePersonas: Persona[] = [];
 
     try {
-      const res = await fetch('/api/sessions', {
+      const res = await fetch(apiUrl('/api/sessions'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -567,7 +568,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     });
 
     // Save turn to backend
-    fetch(`/api/sessions/${state.session.id}/turns`, {
+    fetch(apiUrl(`/api/sessions/${state.session.id}/turns`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newTurn)
@@ -666,7 +667,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const timeoutId = setTimeout(() => controller.abort(), 2500);
 
       try {
-        const res = await fetch('/api/listen', {
+        const res = await fetch(apiUrl('/api/listen'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
@@ -880,7 +881,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
               text: promptText,
               onEnd: async () => {
                 // Generate AI opening line
-                const speakRes = await fetch('/api/speak', {
+                const speakRes = await fetch(apiUrl('/api/speak'), {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -1086,7 +1087,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       };
 
       set({ transcript: [...state.transcript, modTurn] });
-      fetch(`/api/sessions/${state.session.id}/turns`, {
+      fetch(apiUrl(`/api/sessions/${state.session.id}/turns`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(modTurn)
@@ -1233,7 +1234,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       let noveltyEvidence = '';
       
       for (let attempt = 1; attempt <= 2; attempt++) {
-        const speakRes = await fetch('/api/speak', {
+        const speakRes = await fetch(apiUrl('/api/speak'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1271,7 +1272,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
         // F3 Novelty Check via API
         try {
-          const novRes = await fetch('/api/novelty-check', {
+          const novRes = await fetch(apiUrl('/api/novelty-check'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionId: state.session.id, speakerId: winnerId, text: fullLineText })
@@ -1385,14 +1386,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       });
 
       // Save turn to backend
-      fetch(`/api/sessions/${state.session.id}/turns`, {
+      fetch(apiUrl(`/api/sessions/${state.session.id}/turns`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(aiTurn)
       }).catch(() => {});
 
       // F1: Write to PointLedger
-      fetch('/api/points', {
+      fetch(apiUrl('/api/points'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1408,7 +1409,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
       // F6: Digest v2 every 6 turns
       if (turnIdx % 6 === 0) {
-        fetch('/api/loop-analysis', {
+        fetch(apiUrl('/api/loop-analysis'), {
            method: 'POST',
            headers: { 'Content-Type': 'application/json' },
            body: JSON.stringify({
@@ -1519,7 +1520,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           console.log(`[Interruption Fight-Back] ${persona.name} (stubbornness ${persona.params.stubbornness}): ${isStubborn ? 'FIGHT BACK' : 'YIELD'}`);
 
           if (isStubborn) {
-            fetch('/api/listen', {
+            fetch(apiUrl('/api/listen'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1582,14 +1583,14 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     if (state.session) {
       try {
-        await fetch(`/api/sessions/${state.session.id}/end`, {
+        await fetch(apiUrl(`/api/sessions/${state.session.id}/end`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ durationSec, status: 'COMPLETED' })
         });
 
         // Request report generation with sessionEvents & notableMoments
-        await fetch('/api/report', {
+        await fetch(apiUrl('/api/report'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -21,6 +21,7 @@ import {
 import { TOPIC_PRESETS, TopicPreset } from '../../lib/topics';
 import { PERSONAS, selectRandomPanel } from '../../lib/personas';
 import { TopicType, LanguageMode, SessionSettings, RoomIntensity } from '../../lib/types';
+import { apiUrl } from '../../lib/api';
 
 interface GDSettingsModalProps {
   isOpen: boolean;
@@ -69,7 +70,7 @@ export const GDSettingsModal: React.FC<GDSettingsModalProps> = ({ isOpen, onClos
     }
 
     // Check backend health
-    fetch('/api/health')
+    fetch(apiUrl('/api/health'))
       .then(res => res.json())
       .then(data => setApiHealth(data))
       .catch(() => setApiHealth(null));
