@@ -4,8 +4,9 @@ import { createGame } from '../../game/main';
 import { AuthModal } from '../auth/AuthModal';
 import { GDSettingsModal } from '../lobby/GDSettingsModal';
 import { BottomToolbar } from './BottomToolbar';
-import { Settings, MapPin } from 'lucide-react';
+import { Settings, MapPin, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase, buildUserProfile } from '../../lib/supabase';
 
 interface PhaserMapProps {
   onInteract?: (objectId: string) => void;
@@ -15,11 +16,78 @@ interface PhaserMapProps {
 export const PhaserMap: React.FC<PhaserMapProps> = ({ onInteract, onExit }) => {
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const gameInstanceRef = useRef<any>(null);
-  const [showAuthModal, setShowAuthModal] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(() => {
+    if (typeof window !== 'undefined') {
+      if (window.location.search.includes('code=') || window.location.hash.includes('access_token=')) {
+        return false;
+      }
+      const hasSbSession = Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+      if (hasSbSession) {
+        return false;
+      }
+    }
+    return true;
+  });
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [savedSettings, setSavedSettings] = useState<any>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    // Clean up OAuth query parameters from URL once redirected back
+    if (typeof window !== 'undefined') {
+      if (window.location.search.includes('code=') || window.location.hash.includes('access_token=')) {
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState(null, '', cleanUrl);
+      }
+    }
+
+    // 1. Restore active session if present
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!isMounted) return;
+      if (session?.user) {
+        const profile = await buildUserProfile(session.user);
+        if (!isMounted) return;
+        setCurrentUser(profile);
+        setShowAuthModal(false);
+      } else {
+        setShowAuthModal(true);
+      }
+    }).catch(err => {
+      console.warn('[Session Restore Warning]', err);
+    });
+
+    // 2. Listen for auth changes (OAuth redirect completion, login, logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
+        const profile = await buildUserProfile(session.user);
+        if (!isMounted) return;
+        setCurrentUser(profile);
+        setShowAuthModal(false);
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setShowAuthModal(true);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn('Sign out error', err);
+    }
+    setCurrentUser(null);
+    setShowAuthModal(true);
+  };
 
   useEffect(() => {
     if (gameContainerRef.current && !gameInstanceRef.current) {
@@ -41,13 +109,17 @@ export const PhaserMap: React.FC<PhaserMapProps> = ({ onInteract, onExit }) => {
   }, [showAuthModal, showSettingsModal]);
 
   useEffect(() => {
-    if (gameInstanceRef.current) {
-      const scene = gameInstanceRef.current.scene.getScene('GameScene');
-      if (scene) {
-        scene.isUserLoggedIn = !!currentUser;
-        if (currentUser && currentUser.displayName) {
-          scene.updateUserName(currentUser.displayName);
+    if (gameInstanceRef.current && gameInstanceRef.current.scene) {
+      try {
+        const scene = gameInstanceRef.current.scene.getScene('GameScene');
+        if (scene) {
+          scene.isUserLoggedIn = !!currentUser;
+          if (typeof scene.updateUserName === 'function') {
+            scene.updateUserName(currentUser?.displayName || '');
+          }
         }
+      } catch (err) {
+        console.warn('[Phaser Scene Sync]', err);
       }
     }
   }, [currentUser]);
@@ -79,6 +151,13 @@ export const PhaserMap: React.FC<PhaserMapProps> = ({ onInteract, onExit }) => {
               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
               {currentUser.displayName}
             </div>
+            <button
+              onClick={handleLogout}
+              className="p-2.5 bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 rounded-lg shadow-lg border border-slate-700 transition"
+              title="Sign Out"
+            >
+              <LogOut size={18} />
+            </button>
           </div>
         )}
       </div>
@@ -107,8 +186,6 @@ export const PhaserMap: React.FC<PhaserMapProps> = ({ onInteract, onExit }) => {
         onSuccess={(user) => {
           setCurrentUser(user);
           setShowAuthModal(false);
-          // Auto-open settings if they just logged in!
-          setTimeout(() => setShowSettingsModal(true), 500);
         }} 
       />
 

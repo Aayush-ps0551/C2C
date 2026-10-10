@@ -10,9 +10,13 @@ export default class GameScene extends Phaser.Scene {
     this.spawnX = 0;
     this.spawnY = 0;
     this.testSpeakingId = 'small_aarav';
+    this.player = null;
+    this.userNameText = null;
+    this.pendingUserName = null;
   }
 
   create() {
+    this.userNameText = null;
     // 1. Clean up any existing character instances if scene restarts to prevent duplicates
     if (this.aiCharacters) {
       this.aiCharacters.forEach((char) => char.destroy());
@@ -78,6 +82,11 @@ export default class GameScene extends Phaser.Scene {
     // 7. Spawn Player
     this.player = new Player(this, this.spawnX, this.spawnY);
     this.player.setDepth(10);
+
+    // Apply pending username if set before create() ran
+    if (this.pendingUserName) {
+      this.updateUserName(this.pendingUserName);
+    }
 
     // 8. Setup physics colliders
     if (this.collisionLayer) {
@@ -204,6 +213,21 @@ export default class GameScene extends Phaser.Scene {
   }
 
   updateUserName(name) {
+    this.pendingUserName = name || null;
+
+    if (!name) {
+      if (this.userNameText) {
+        this.userNameText.destroy();
+        this.userNameText = null;
+      }
+      return;
+    }
+
+    // Guard: defer until player and scene factory exist
+    if (!this.player || !this.add) {
+      return;
+    }
+
     if (!this.userNameText) {
       this.userNameText = this.add.text(this.player.x, this.player.y - 18, name, {
         fontFamily: 'system-ui, sans-serif',
