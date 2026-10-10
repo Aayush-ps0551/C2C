@@ -149,7 +149,14 @@ Respond ONLY with JSON:
 
   } catch (err: any) {
     console.warn(`[Speak Pass Error] Fallback line used (${Date.now() - startTime}ms):`, err.message);
-    res.json({ text: "" });
+    
+    // Pick a fallback line so they don't stay completely silent
+    const personaId = req.body.personaId || 'meera';
+    const persona = personaId === 'moderator' ? MODERATOR : (getPersonaById(personaId) || getPersonaById('meera'));
+    const availableLines = persona?.fallbackLines || ["I think we need to look at this from another angle."];
+    const fallbackText = availableLines[Math.floor(Math.random() * availableLines.length)];
+    
+    res.json({ text: fallbackText });
   }
 });
 

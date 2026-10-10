@@ -15,18 +15,20 @@ import {
   ArrowRight,
   Flame,
   Award,
-  ShieldAlert
+  ShieldAlert,
+  X
 } from 'lucide-react';
 import { TOPIC_PRESETS, TopicPreset } from '../../lib/topics';
 import { PERSONAS, selectRandomPanel } from '../../lib/personas';
 import { TopicType, LanguageMode, SessionSettings, RoomIntensity } from '../../lib/types';
 
-interface LobbyViewProps {
-  onStartSession: (topic: string, topicType: TopicType, caseBrief?: string, settings?: Partial<SessionSettings>) => void;
-  onViewHistory: () => void;
+interface GDSettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (topic: string, topicType: TopicType, caseBrief?: string, settings?: Partial<SessionSettings>) => void;
 }
 
-export const LobbyView: React.FC<LobbyViewProps> = ({ onStartSession, onViewHistory }) => {
+export const GDSettingsModal: React.FC<GDSettingsModalProps> = ({ isOpen, onClose, onSave }) => {
   const [selectedCategory, setSelectedCategory] = useState<TopicType>('CONTEMPORARY');
   const [selectedPresetId, setSelectedPresetId] = useState<string>('contemp-1');
   const [customTopic, setCustomTopic] = useState<string>('');
@@ -91,7 +93,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({ onStartSession, onViewHist
       ? (caseBrief || currentPreset?.caseBrief) 
       : undefined;
 
-    onStartSession(finalTopic, selectedCategory, finalBrief, {
+    onSave(finalTopic, selectedCategory, finalBrief, {
       panelSize,
       durationMinutes,
       patienceMs,
@@ -102,23 +104,28 @@ export const LobbyView: React.FC<LobbyViewProps> = ({ onStartSession, onViewHist
     });
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto pt-10 pb-20" onKeyDown={(e) => e.stopPropagation()}>
+      <div className="relative w-full max-w-6xl mx-auto glass-panel p-8 rounded-2xl shadow-2xl border border-slate-700/60">
+        {/* Close button */}
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition"
+        >
+          <X size={24} />
+        </button>
+
       {/* Top Disclosure & Status Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-800 pr-10">
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-medium">
           <ShieldAlert className="w-4 h-4 text-blue-400 animate-pulse" />
           <span>AI Disclosure: Every other participant in the arena is AI</span>
         </div>
 
         <div className="flex items-center gap-3">
-          <button 
-            onClick={onViewHistory}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs transition border border-slate-700/60"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-purple-400" />
-            <span>Past GD Reports</span>
-          </button>
+          {/* Removed history button since it's not part of settings */}
 
           {apiHealth && (
             <div className="flex items-center gap-1.5 text-xs text-slate-400">
@@ -145,8 +152,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({ onStartSession, onViewHist
           GD Arena
         </h1>
         <p className="text-slate-400 max-w-2xl mx-auto text-base sm:text-lg">
-          Join a spoken group discussion with realistic AI participants and a moderator. 
-          Face real interruptions, debate perspectives, and receive a quote-linked placement report.
+          Configure your GD session parameters here. Once saved, walk to the designated room on the map to begin.
         </p>
       </div>
 
@@ -502,11 +508,12 @@ export const LobbyView: React.FC<LobbyViewProps> = ({ onStartSession, onViewHist
               whileTap={{ scale: 0.98 }}
               className="mt-6 w-full py-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-base shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition"
             >
-              <span>Start Group Discussion</span>
+              <span>Save Settings & Get Directions</span>
               <ArrowRight className="w-5 h-5" />
             </motion.button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

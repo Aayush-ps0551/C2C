@@ -47,6 +47,7 @@ app.get('/api/health', (_req, res) => {
 import pointsRouter from './routes/points';
 import loopAnalysisRouter from './routes/loop-analysis';
 import noveltyCheckRouter from './routes/novelty-check';
+import evaluationsRouter from './routes/evaluations';
 
 // API Routes
 app.use('/api/sessions', sessionsRouter);
@@ -58,6 +59,7 @@ app.use('/api/tts', ttsRouter);
 app.use('/api/points', pointsRouter);
 app.use('/api/loop-analysis', loopAnalysisRouter);
 app.use('/api/novelty-check', noveltyCheckRouter);
+app.use('/api/evaluations', evaluationsRouter);
 
 // Global Error Handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

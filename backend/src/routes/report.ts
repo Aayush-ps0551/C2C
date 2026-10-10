@@ -130,11 +130,11 @@ router.post('/', async (req: Request, res: Response) => {
 
     const session = await getSessionDb(sessionId);
 
-    // Minimum guard from Resilience Matrix: >= 4 turns required for report
-    if (turns.length < 4) {
+    // Minimum guard: At least 1 turn required
+    if (turns.length === 0) {
       res.status(400).json({ 
         error: 'Insufficient turns for analysis', 
-        message: 'At least 4 turns are required to generate a comprehensive placement feedback report.' 
+        message: 'At least 1 turn is required to generate a comprehensive placement feedback report.' 
       });
       return;
     }

@@ -5,9 +5,11 @@ import { Session } from '../../lib/types';
 interface HistoryViewProps {
   onBackToLobby: () => void;
   onSelectReport: (sessionId: string) => void;
+  onEvaluateSession: (sessionId: string) => void;
+  onViewResults: (sessionId: string) => void;
 }
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ onBackToLobby, onSelectReport }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ onBackToLobby, onSelectReport, onEvaluateSession, onViewResults }) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -82,9 +84,25 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ onBackToLobby, onSelec
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-blue-400 font-semibold text-xs shrink-0">
-                <span>View Evaluation</span>
-                <ChevronRight className="w-4 h-4" />
+              <div className="flex flex-col sm:flex-row items-center gap-2 shrink-0">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onSelectReport(s.id); }}
+                  className="px-3 py-1.5 rounded-lg bg-purple-600/20 text-purple-400 text-xs font-semibold hover:bg-purple-600/40 transition border border-purple-500/30"
+                >
+                  AI Report
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEvaluateSession(s.id); }}
+                  className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 text-xs font-semibold hover:bg-blue-600/40 transition border border-blue-500/30"
+                >
+                  Evaluate
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onViewResults(s.id); }}
+                  className="px-3 py-1.5 rounded-lg bg-green-600/20 text-green-400 text-xs font-semibold hover:bg-green-600/40 transition border border-green-500/30"
+                >
+                  Final Results
+                </button>
               </div>
             </div>
           ))}

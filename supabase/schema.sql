@@ -97,3 +97,97 @@ CREATE INDEX IF NOT EXISTS "idx_point_ledger_session" ON public."PointLedger"("s
 ALTER TABLE public."PointLedger" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow public read/write PointLedger" ON public."PointLedger";
 CREATE POLICY "Allow public read/write PointLedger" ON public."PointLedger" FOR ALL USING (true) WITH CHECK (true);
+-- ==============================================================================
+-- GD Evaluation System
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS public.gd_roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL, 
+  role TEXT NOT NULL CHECK (role IN ('ADMIN', 'EVALUATOR', 'PARTICIPANT')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.gd_criteria (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  weightage INT NOT NULL CHECK (weightage >= 0 AND weightage <= 100),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.gd_participants (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
+  user_id UUID, 
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.gd_evaluators (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
+  evaluator_id UUID NOT NULL, 
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.gd_evaluations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
+  participant_id UUID NOT NULL REFERENCES public.gd_participants(id) ON DELETE CASCADE,
+  evaluator_id UUID NOT NULL, 
+  status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'SUBMITTED')),
+  feedback TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(participant_id, evaluator_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.gd_scores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  evaluation_id UUID NOT NULL REFERENCES public.gd_evaluations(id) ON DELETE CASCADE,
+  criterion_id UUID NOT NULL REFERENCES public.gd_criteria(id) ON DELETE CASCADE,
+  score NUMERIC NOT NULL CHECK (score >= 0 AND score <= 10),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(evaluation_id, criterion_id)
+);
+
+-- RLS
+ALTER TABLE public.gd_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.gd_criteria ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.gd_participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.gd_evaluators ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.gd_evaluations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.gd_scores ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read/write gd_roles" ON public.gd_roles;
+DROP POLICY IF EXISTS "Allow public read/write gd_criteria" ON public.gd_criteria;
+DROP POLICY IF EXISTS "Allow public read/write gd_participants" ON public.gd_participants;
+DROP POLICY IF EXISTS "Allow public read/write gd_evaluators" ON public.gd_evaluators;
+DROP POLICY IF EXISTS "Allow public read/write gd_evaluations" ON public.gd_evaluations;
+DROP POLICY IF EXISTS "Allow public read/write gd_scores" ON public.gd_scores;
+
+CREATE POLICY "Allow public read/write gd_roles" ON public.gd_roles FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public read/write gd_criteria" ON public.gd_criteria FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public read/write gd_participants" ON public.gd_participants FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public read/write gd_evaluators" ON public.gd_evaluators FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public read/write gd_evaluations" ON public.gd_evaluations FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public read/write gd_scores" ON public.gd_scores FOR ALL USING (true) WITH CHECK (true);
+
+-- ==============================================================================
+-- User Profiles
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS public.users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read/write users" ON public.users;
+CREATE POLICY "Allow public read/write users" ON public.users FOR ALL USING (true) WITH CHECK (true);
+
