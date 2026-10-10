@@ -6,10 +6,13 @@
 -- 1. Create Sessions Table
 CREATE TABLE IF NOT EXISTS public.sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  host_id UUID, -- References public.users(id) but kept loose for demo
   topic TEXT NOT NULL,
   topic_type TEXT NOT NULL, -- CONTEMPORARY | ABSTRACT | CASE | CONTROVERSIAL | CUSTOM
   case_brief TEXT,
   language_mode TEXT NOT NULL DEFAULT 'EN', -- EN | HINGLISH
+  intensity TEXT NOT NULL DEFAULT 'REAL_GD', -- CAMPUS_MOCK | REAL_GD | PLACEMENT_BRUTAL
+  opening_round_enabled BOOLEAN NOT NULL DEFAULT true,
   panel_size INT NOT NULL DEFAULT 4,
   persona_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
   settings JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -121,6 +124,8 @@ CREATE TABLE IF NOT EXISTS public.gd_participants (
   session_id UUID NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
   user_id UUID, 
   name TEXT NOT NULL,
+  is_ai BOOLEAN NOT NULL DEFAULT false,
+  persona_id TEXT, -- e.g., 'amelia', 'alex'
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -179,10 +184,12 @@ CREATE POLICY "Allow public read/write gd_scores" ON public.gd_scores FOR ALL US
 -- ==============================================================================
 
 CREATE TABLE IF NOT EXISTS public.users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY, -- Will map to auth.users.id
   email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
+  password_hash TEXT, -- Optional since Supabase auth manages passwords
   display_name TEXT NOT NULL,
+  avatar_url TEXT,
+  last_room TEXT, -- e.g. 'North Room' for map persistency
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

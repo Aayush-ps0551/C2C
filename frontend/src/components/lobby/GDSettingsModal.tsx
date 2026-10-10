@@ -255,7 +255,7 @@ export const GDSettingsModal: React.FC<GDSettingsModalProps> = ({ isOpen, onClos
               </h2>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400">Panel Size:</span>
-                {[3, 4, 5].map((size) => (
+                {[3, 5, 7].map((size) => (
                   <button
                     key={size}
                     onClick={() => setPanelSize(size)}

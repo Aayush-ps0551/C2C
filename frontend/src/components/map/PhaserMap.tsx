@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createGame } from '../../game/main';
 import { AuthModal } from '../auth/AuthModal';
 import { GDSettingsModal } from '../lobby/GDSettingsModal';
+import { BottomToolbar } from './BottomToolbar';
 import { Settings, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -96,6 +97,9 @@ export const PhaserMap: React.FC<PhaserMapProps> = ({ onInteract, onExit }) => {
         )}
       </AnimatePresence>
 
+      {/* Optional Toolbar floating at bottom */}
+      {currentUser && <BottomToolbar />}
+
       {/* Auth Modal at Spawn Point */}
       <AuthModal 
         isOpen={showAuthModal} 
@@ -115,10 +119,11 @@ export const PhaserMap: React.FC<PhaserMapProps> = ({ onInteract, onExit }) => {
           setSavedSettings({ topic, type, brief, settings });
           setShowSettingsModal(false);
           
-          // Generate a dynamic direction based on intensity
+          // Generate a dynamic direction based on panel size
           let direction = "the North room";
-          if (settings?.intensity === 'CAMPUS_MOCK') direction = "the Left (Beginner) room";
-          if (settings?.intensity === 'PLACEMENT_BRUTAL') direction = "the Right (Brutal) room";
+          if (settings?.panelSize === 3) direction = "the Left (Small Panel) room";
+          if (settings?.panelSize === 7) direction = "the Right (Large Panel) room";
+          if (settings?.panelSize === 5) direction = "the North (Standard Panel) room";
           
           setToastMessage(`Settings Saved! Head to ${direction} to start the GD.`);
           setTimeout(() => setToastMessage(null), 8000); // Hide after 8s
