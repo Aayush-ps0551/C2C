@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import Player from '../objects/Player.js';
+import AICharacter from '../objects/AICharacter.js';
+import { CHARACTERS } from '../data/characters.js';
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -7,18 +9,25 @@ export default class GameScene extends Phaser.Scene {
     this.isUserLoggedIn = false;
     this.spawnX = 0;
     this.spawnY = 0;
+    this.testSpeakingId = 'small_aarav';
   }
 
   create() {
-    // 1. Create Tilemap from loaded JSON
+    // 1. Clean up any existing character instances if scene restarts to prevent duplicates
+    if (this.aiCharacters) {
+      this.aiCharacters.forEach((char) => char.destroy());
+    }
+    this.aiCharacters = new Map();
+
+    // 2. Create Tilemap from loaded JSON
     const map = this.make.tilemap({ key: 'arena' });
 
-    // 2. Add Tileset images matching Tiled definitions
+    // 3. Add Tileset images matching Tiled definitions
     const roomBuilderTileset = map.addTilesetImage('Room_Builder_free_32x32', 'room_builder');
     const interiorsTileset = map.addTilesetImage('Interiors_free_32x32', 'interiors');
     const tilesets = [roomBuilderTileset, interiorsTileset];
 
-    // 3. Render map layers in visual order
+    // 4. Render map layers in visual order
     this.floorLayer = map.createLayer('Floor', tilesets);
     this.roomDetailsLayer = map.createLayer('Room Details', tilesets);
     this.wallsLayer = map.createLayer('Walls', tilesets);
@@ -46,7 +55,13 @@ export default class GameScene extends Phaser.Scene {
       this.furnitureLayer.setCollision(solidFurnitureGids);
     }
 
-    // 4. Read PlayerSpawn object from 'Player Spawn' object group
+    // 5. Instantiate Stationary AI Participants and Room Moderators (all 18 characters)
+    CHARACTERS.forEach((charConfig) => {
+      const char = new AICharacter(this, charConfig);
+      this.aiCharacters.set(charConfig.id, char);
+    });
+
+    // 6. Read PlayerSpawn object from 'Player Spawn' object group
     this.spawnX = 1296;
     this.spawnY = 1616;
     const spawnLayer = map.getObjectLayer('Player Spawn');
@@ -60,11 +75,11 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // 5. Spawn Player
+    // 7. Spawn Player
     this.player = new Player(this, this.spawnX, this.spawnY);
     this.player.setDepth(10);
 
-    // 6. Setup physics colliders
+    // 8. Setup physics colliders
     if (this.collisionLayer) {
       this.physics.add.collider(this.player, this.collisionLayer);
     }
@@ -72,24 +87,29 @@ export default class GameScene extends Phaser.Scene {
       this.physics.add.collider(this.player, this.furnitureLayer);
     }
 
-    // 7. World and Camera bounds
+    // 9. World and Camera bounds
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
     this.cameras.main.setZoom(1.5);
 
-    // 8. Minimalist HUD instructions
+    // 10. Minimalist HUD & Developer controls
     this.createHud();
+
+    // 11. Developer keyboard shortcut to toggle speaker indicator (Key 'T')
+    this.input.keyboard.on('keydown-T', () => {
+      this.toggleDevSpeakingTest();
+    });
   }
 
   createHud() {
     const hudContainer = this.add.container(20, 20).setScrollFactor(0).setDepth(100);
 
     const bg = this.add.graphics();
-    bg.fillStyle(0x0f172a, 0.75);
-    bg.fillRoundedRect(0, 0, 240, 44, 8);
+    bg.fillStyle(0x0f172a, 0.85);
+    bg.fillRoundedRect(0, 0, 310, 68, 8);
     bg.lineStyle(1, 0x334155, 0.9);
-    bg.strokeRoundedRect(0, 0, 240, 44, 8);
+    bg.strokeRoundedRect(0, 0, 310, 68, 8);
     hudContainer.add(bg);
 
     const title = this.add.text(12, 8, 'GD Arena', {
@@ -100,12 +120,66 @@ export default class GameScene extends Phaser.Scene {
     });
     hudContainer.add(title);
 
-    const hint = this.add.text(12, 24, 'WASD / Arrow Keys to Explore', {
+    const hint = this.add.text(12, 24, 'WASD / Arrow Keys: Move  •  T: Toggle Speaker Test', {
       fontFamily: 'system-ui, sans-serif',
-      fontSize: '11px',
+      fontSize: '10px',
       color: '#94a3b8'
     });
     hudContainer.add(hint);
+
+    // Interactive button for developer testing of speaking indicator
+    this.speakTestBtn = this.add.text(12, 44, '🔊 Test Speaker (Aarav): OFF', {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '11px',
+      color: '#cbd5e1',
+      backgroundColor: '#1e293b',
+      padding: { x: 8, y: 3 }
+    })
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.toggleDevSpeakingTest())
+      .on('pointerover', () => this.speakTestBtn.setStyle({ color: '#38bdf8' }))
+      .on('pointerout', () => this.speakTestBtn.setStyle({ color: this.getTestChar()?.isSpeaking ? '#4ade80' : '#cbd5e1' }));
+
+    hudContainer.add(this.speakTestBtn);
+  }
+
+  getTestChar() {
+    return this.getCharacterById(this.testSpeakingId);
+  }
+
+  toggleDevSpeakingTest() {
+    const target = this.getTestChar();
+    if (!target) return;
+
+    const nextState = !target.isSpeaking;
+    target.setSpeaking(nextState);
+
+    if (this.speakTestBtn) {
+      if (nextState) {
+        this.speakTestBtn.setText(`🔊 Test Speaker (${target.characterName}): ACTIVE [ON]`);
+        this.speakTestBtn.setStyle({ color: '#4ade80', backgroundColor: '#064e3b' });
+      } else {
+        this.speakTestBtn.setText(`🔊 Test Speaker (${target.characterName}): OFF`);
+        this.speakTestBtn.setStyle({ color: '#cbd5e1', backgroundColor: '#1e293b' });
+      }
+    }
+  }
+
+  /**
+   * Look up stationary AI participant or Moderator by ID.
+   */
+  getCharacterById(id) {
+    return this.aiCharacters.get(id);
+  }
+
+  /**
+   * Reusable method to activate/deactivate speaking state for any character by ID.
+   */
+  setSpeaking(id, isSpeaking) {
+    const char = this.getCharacterById(id);
+    if (char) {
+      char.setSpeaking(isSpeaking);
+    }
   }
 
   update(time, delta) {
